@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>정령의 숲 퍼즐</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>✦ 정령의 숲 ✦</h1>
+    <div class="score-row">
+      <div class="score-box">
+        <span class="label">점수</span>
+        <span id="score">0</span>
+      </div>
+      <div class="score-box">
+        <span class="label">최고 점수</span>
+        <span id="best">0</span>
+      </div>
+      <button id="restart">다시 시작</button>
+      <button id="sound-btn">🔊</button>
+    </div>
+    <div id="sound-panel" class="hidden">
+      <div class="sp-row">
+        <label><input type="checkbox" id="sfx-on"> 효과음</label>
+        <input type="range" id="sfx-vol" min="0" max="100">
+      </div>
+      <div class="sp-row">
+        <label><input type="checkbox" id="bgm-on"> 배경음악</label>
+        <input type="range" id="bgm-vol" min="0" max="100">
+      </div>
+      <div class="sp-row track-row">
+        <button id="track-prev">◀</button>
+        <span id="track-name"></span>
+        <button id="track-next">▶</button>
+      </div>
+    </div>
+    <div id="power-row">
+      <div id="fever-wrap">
+        <div id="fever-bar"></div>
+        <span id="fever-label">FEVER</span>
+      </div>
+      <button id="ult-btn" title="필살기">
+        <img src="assets/specials/rainbow.png" alt="필살기">
+        <span id="ult-label">필살기</span>
+      </button>
+    </div>
+  </header>
+
+  <div id="board-wrap">
+    <div id="board"></div>
+    <div id="combo-banner"></div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="flash"></div>
+
+  <script src="audio.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

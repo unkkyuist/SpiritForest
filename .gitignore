@@ -1,0 +1,7 @@
+# Godot editor binaries (not part of the game)
+*.exe
+
+# local tooling
+.claude/
+node_modules/
+.vercel/
