@@ -90,6 +90,7 @@ const Sound = (() => {
                    tone(f, 0.35, { type: 'triangle', vol: 0.2, delay: 0.62 + i * 0.07 })); },
     ultReady() { [880, 1109, 1319].forEach((f, i) => tone(f, 0.2, { type: 'square', vol: 0.12, delay: i * 0.07 })); },
     record()   { [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.22, { type: 'triangle', vol: 0.18, delay: i * 0.06 })); },
+    timeup()   { [784, 659, 523, 392].forEach((f, i) => tone(f, 0.3, { type: 'sawtooth', vol: 0.22, delay: i * 0.18 })); },
   };
 
   function play(name, ...args) {
@@ -140,14 +141,6 @@ const Sound = (() => {
   }
 
   function initUI() {
-    $('sound-btn').addEventListener('click', e => {
-      e.stopPropagation();
-      $('sound-panel').classList.toggle('hidden');
-    });
-    document.addEventListener('pointerdown', e => {
-      if (!e.target.closest('#sound-panel') && !e.target.closest('#sound-btn'))
-        $('sound-panel').classList.add('hidden');
-    });
     $('sfx-on').addEventListener('change', e => { settings.sfxOn = e.target.checked; save(); updateUI(); if (settings.sfxOn) play('select'); });
     $('bgm-on').addEventListener('change', e => { settings.bgmOn = e.target.checked; save(); applyBgm(); });
     $('sfx-vol').addEventListener('input', e => {

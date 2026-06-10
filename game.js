@@ -20,9 +20,24 @@ const bestEl = document.getElementById('best');
 const comboEl = document.getElementById('combo-banner');
 const toastEl = document.getElementById('toast');
 
+/* ── 화면 상태 / 모드 설정 ─────────────────────────────────────── */
+
+const PREFS_KEY = 'spiritforest_prefs';
+const prefs = Object.assign(
+  { mode: 'endless', duration: 60 },
+  JSON.parse(localStorage.getItem(PREFS_KEY) || '{}')
+);
+const savePrefs = () => localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+
+let gameMode = prefs.mode;
+let uiState = 'title';
+let settingsOrigin = 'title';
+const bestKeyFor = mode => 'spiritforest_best_' + mode;
+const bestKey = () => bestKeyFor(gameMode);
+
 let grid = [];          // grid[r][c] -> tile | null
 let score = 0;
-let best = Number(localStorage.getItem('spiritforest_best') || 0);
+let best = Number(localStorage.getItem(bestKey()) || 0);
 let busy = false;
 let selected = null;
 let bestAtStart = best;   // 신기록 연출용
@@ -273,6 +288,7 @@ function spawnFx(tile) {
 
 /* 특수+특수 교환 콤보 — 단일 효과보다 강력해진다 */
 function comboTargets(a, b) {
+  viaJump();
   const r = a.r, c = a.c;            // 콤보 중심 = 움직인 타일 위치
   const set = new Set([a, b]);
   const kinds = [a.special, b.special];
@@ -332,6 +348,7 @@ function expandClears(initial, protectedSet = new Set()) {
       Sound.play(t.special);          // wind/blessing/burst/rainbow 발동음
       if (t.special === 'burst') shake(2);
       if (t.special === 'rainbow') shake(3);
+      viaJump();
       effectTargets(t).forEach(x => queue.push(x));
     }
   }
@@ -455,6 +472,7 @@ async function trySwap(a, b) {
     spawnFxRainbow();
     Sound.play('rainbow');
     shake(3);
+    viaJump();
     const initial = new Set([rainbow, other]);
     if (bRainbow && aRainbow) {                  // 무지개 + 무지개 = 전체 제거
       for (let r = 0; r < ROWS; r++)
@@ -547,6 +565,24 @@ function reshuffle(animate) {
     }
   }
   newGame(); // 섞기 실패 시 새 보드
+}
+
+/* ── 마스코트 비아: 아이템 발동 시 신나서 점프 ──────────────────── */
+
+const viaEl = document.getElementById('via');
+const VIA_IDLE = 'assets/via/idle.png';
+const VIA_JUMP = 'assets/via/jump.png';
+new Image().src = VIA_JUMP;          // 점프 이미지 미리 로드 (깜빡임 방지)
+let viaTimer = null;
+
+function viaJump(dur = 1200) {
+  viaEl.src = VIA_JUMP;
+  viaEl.classList.add('jump');
+  clearTimeout(viaTimer);
+  viaTimer = setTimeout(() => {
+    viaEl.classList.remove('jump');
+    viaEl.src = VIA_IDLE;
+  }, dur);
 }
 
 /* ── 도파민: 파티클 / 점수 팝업 / 흔들림 / 피버 ─────────────────── */
@@ -681,6 +717,7 @@ async function activateUltimate() {
   ultCharge = 0;
   renderUlt();
   Sound.play('ultimate');
+  viaJump(2200);
 
   // 1) 라이저: 보드가 진동하며 밝아짐
   document.body.classList.add('ult-charging');
@@ -776,7 +813,7 @@ function updateScore(delta) {
   }
   if (score > best) {
     best = score;
-    localStorage.setItem('spiritforest_best', String(best));
+    localStorage.setItem(bestKey(), String(best));
   }
   bestEl.textContent = best.toLocaleString();
   return delta;
@@ -851,9 +888,123 @@ window.addEventListener('pointerup', () => {
 
 document.getElementById('restart').addEventListener('click', () => {
   if (busy) return;
+  startGame(gameMode);
+});
+
+/* ── 화면 전환 (시작 / 설정 / 게임 종료) ────────────────────────── */
+
+const overlayEl = document.getElementById('overlay');
+const screens = {
+  title: document.getElementById('screen-title'),
+  settings: document.getElementById('screen-settings'),
+  gameover: document.getElementById('screen-gameover'),
+};
+const timerBoxEl = document.getElementById('timer-box');
+const timerEl = document.getElementById('timer');
+const durationRowEl = document.getElementById('duration-row');
+const durationSelectEl = document.getElementById('duration-select');
+
+function showScreen(name) {
+  uiState = name;
+  if (!name) {
+    overlayEl.classList.add('hidden');
+    return;
+  }
+  overlayEl.classList.remove('hidden');
+  for (const key in screens) screens[key].classList.toggle('hidden', key !== name);
+  if (name === 'title') updateTitleBest();
+}
+
+function updateTitleBest() {
+  document.getElementById('title-best-score').textContent =
+    Number(localStorage.getItem(bestKeyFor(prefs.mode)) || 0).toLocaleString();
+}
+
+function openSettings(origin) {
+  settingsOrigin = origin;
+  document.querySelector(`input[name="game-mode"][value="${prefs.mode}"]`).checked = true;
+  durationSelectEl.value = String(prefs.duration);
+  durationRowEl.classList.toggle('hidden', prefs.mode !== 'timeattack');
+  showScreen('settings');
+}
+
+function startGame(mode) {
+  prefs.mode = mode;
+  savePrefs();
+  gameMode = mode;
+  best = Number(localStorage.getItem(bestKey()) || 0);
+  bestEl.textContent = best.toLocaleString();
+  busy = false;
+  stopTimer();
+  timerBoxEl.classList.toggle('hidden', mode !== 'timeattack');
+  showScreen(null);
   newGame();
+  if (mode === 'timeattack') startTimer(prefs.duration);
+}
+
+/* ── 타임어택 타이머 ──────────────────────────────────────────── */
+
+let timerInterval = null;
+let timeLeft = 0;
+
+function startTimer(duration) {
+  timeLeft = duration;
+  timerEl.textContent = timeLeft;
+  timerBoxEl.classList.remove('warn');
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    timerEl.textContent = Math.max(0, timeLeft);
+    timerBoxEl.classList.toggle('warn', timeLeft > 0 && timeLeft <= 10);
+    if (timeLeft <= 0) {
+      stopTimer();
+      endTimeAttack();
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  timerBoxEl.classList.remove('warn');
+}
+
+function endTimeAttack() {
+  busy = true;
+  Sound.play('timeup');
+  shake(2);
+  document.getElementById('final-score').textContent = score.toLocaleString();
+  document.getElementById('final-best').textContent = best.toLocaleString();
+  showScreen('gameover');
+}
+
+/* ── 화면 버튼 이벤트 ─────────────────────────────────────────── */
+
+document.getElementById('start-btn').addEventListener('click', () => startGame(prefs.mode));
+document.getElementById('open-settings-btn').addEventListener('click', () => openSettings('title'));
+document.getElementById('settings-back-btn').addEventListener('click', () => {
+  showScreen(settingsOrigin === 'title' ? 'title' : null);
+});
+document.getElementById('home-btn').addEventListener('click', () => {
+  stopTimer();
+  showScreen('title');
+});
+document.getElementById('retry-btn').addEventListener('click', () => startGame(gameMode));
+document.getElementById('gameover-home-btn').addEventListener('click', () => showScreen('title'));
+document.getElementById('sound-btn').addEventListener('click', () => openSettings('game'));
+
+document.querySelectorAll('input[name="game-mode"]').forEach(radio => {
+  radio.addEventListener('change', e => {
+    prefs.mode = e.target.value;
+    savePrefs();
+    durationRowEl.classList.toggle('hidden', prefs.mode !== 'timeattack');
+  });
+});
+
+durationSelectEl.addEventListener('change', e => {
+  prefs.duration = Number(e.target.value);
+  savePrefs();
 });
 
 /* ── go ────────────────────────────────────────────────────────── */
 
 newGame();
+showScreen('title');
